@@ -22,23 +22,23 @@
       set_fact:
         image_updated: false
       loop: "{{ compose_dict['services'].items() }}"
-      when: item[1].image.split(':')[1] != image_tag
       loop_control:
-        key: service_name
+        loop_var: service_item
+      when: service_item[1].image.split(':')[1] != image_tag
 
     - name: Update the image tag in docker-compose.yaml
       set_fact:
         compose_dict_updated: "{{ compose_dict }}"
       loop: "{{ compose_dict['services'].items() }}"
-      when: item[1].image.split(':')[1] != image_tag
       loop_control:
-        key: service_name
+        loop_var: service_item
+      when: service_item[1].image.split(':')[1] != image_tag
       block:
         - set_fact:
             image_updated: true
         - set_fact:
             compose_dict_updated: >
-              {{ compose_dict_updated | combine({ 'services': { (item[0]): { 'image': (item[1].image.split(':')[0] + ':' + image_tag) } } }) }}
+              {{ compose_dict_updated | combine({ 'services': { (service_item[0]): { 'image': (service_item[1].image.split(':')[0] + ':' + image_tag) } } }) }}
 
     - name: Write updated docker-compose.yaml content
       copy:
