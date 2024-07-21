@@ -1,8 +1,1 @@
-version: '3.7'
 
-services:
-  nginx:
-    image: testing:latest.v1
-    container_name: nginx
-    ports:
-      - "80:80"
