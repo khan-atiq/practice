@@ -1,0 +1,26 @@
+---
+- name: CD Pipeline
+  hosts: localhost
+  become: yes
+
+  vars:
+    env_file_path: /home/dmacq/testing_rnd/.env
+    docker_compose_path: /home/dmacq/testing_rnd/docker-compose.yaml
+
+  tasks:
+    - name: Update .env file with new IMAGE_TAG
+      lineinfile:
+        path: "{{ env_file_path }}"
+        regexp: '^IMAGE_TAG='
+        line: "IMAGE_TAG={{ IMAGE_TAG }}"
+        backrefs: yes
+
+    - name: Run Docker Compose down
+      shell: docker-compose -f "{{ docker_compose_path }}" down
+      args:
+        chdir: "{{ docker_compose_path | dirname }}"
+
+    - name: Run Docker Compose up
+      shell: docker-compose -f "{{ docker_compose_path }}" up -d
+      args:
+        chdir: "{{ docker_compose_path | dirname }}"
