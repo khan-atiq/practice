@@ -18,38 +18,38 @@
       set_fact:
         compose_dict: "{{ compose_content | from_yaml }}"
 
-    - name: Check if the image tag needs to be updated
+    - name: Check and update image tags in docker-compose.yaml
       set_fact:
-        image_updated: false
+        updated_services: >-
+          {{
+            dict(compose_dict['services'].items() |
+            map('extract', 0, 1) |
+            map('extract', 1) |
+            map('extract', 'image') |
+            map('split', ':') |
+            map('first') |
+            map('combine', compose_dict['services'].keys()) |
+            list)
+          }}
       loop: "{{ compose_dict['services'].items() }}"
       loop_control:
         loop_var: service_item
       when: service_item[1].image.split(':')[1] != image_tag
-
-    - name: Update the image tag in docker-compose.yaml
+      vars:
+        updated_image: "{{ service_item[1].image.split(':')[0] + ':' + image_tag }}"
       set_fact:
-        compose_dict_updated: "{{ compose_dict }}"
-      loop: "{{ compose_dict['services'].items() }}"
-      loop_control:
-        loop_var: service_item
-      when: service_item[1].image.split(':')[1] != image_tag
-      block:
-        - set_fact:
-            image_updated: true
-        - set_fact:
-            compose_dict_updated: >
-              {{ compose_dict_updated | combine({ 'services': { (service_item[0]): { 'image': (service_item[1].image.split(':')[0] + ':' + image_tag) } } }) }}
+        compose_dict_updated: "{{ compose_dict | combine({'services': {service_item[0]: {'image': updated_image}}}) }}"
 
     - name: Write updated docker-compose.yaml content
       copy:
         dest: "{{ compose_file_path }}"
         content: "{{ compose_dict_updated | to_nice_yaml }}"
-      when: image_updated
+      when: updated_services
 
     - name: Bring down Docker Compose services
       command: docker-compose -f "{{ compose_file_path }}" down
-      when: image_updated
+      when: updated_services
 
     - name: Bring up Docker Compose services
       command: docker-compose -f "{{ compose_file_path }}" up -d
-      when: image_updated
+      when: updated_services
