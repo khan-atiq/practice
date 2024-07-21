@@ -5,15 +5,19 @@
     env_file_path: /home/dmacq/testing_rnd/.env
     docker_compose_path: /home/dmacq/testing_rnd/docker-compose.yaml
 
-  tasks:
+ tasks:
     - name: Read .env file
       slurp:
         src: "{{ env_file_path }}"
       register: env_file_content
 
-    - name: Check current IMAGE_TAG value
+    - name: Extract IMAGE_TAG from .env file
       set_fact:
-        current_image_tag: "{{ env_file_content['content'] | b64decode | regex_search('^IMAGE_TAG=(.*)$', multiline=True) | select(0) }}"
+        current_image_tag: "{{ env_file_content['content'] | b64decode | regex_search('^IMAGE_TAG=(.*)', multiline=True) | first }}"
+    
+    - name: Check if IMAGE_TAG is the same
+      set_fact:
+        image_tag_same: "{{ current_image_tag == IMAGE_TAG }}"
 
     - name: Update .env file with new IMAGE_TAG if different
       lineinfile:
@@ -21,21 +25,21 @@
         regexp: '^IMAGE_TAG='
         line: "IMAGE_TAG={{ IMAGE_TAG }}"
         backrefs: yes
-      when: current_image_tag != "IMAGE_TAG={{ IMAGE_TAG }}"
+      when: not image_tag_same
 
     - name: Skip Docker Compose tasks if IMAGE_TAG is the same
       debug:
         msg: "IMAGE_TAG is the same. Skipping Docker Compose down and up tasks."
-      when: current_image_tag == "IMAGE_TAG={{ IMAGE_TAG }}"
+      when: image_tag_same
 
     - name: Run Docker Compose down
       shell: docker-compose -f "{{ docker_compose_path }}" down
       args:
         chdir: "{{ docker_compose_path | dirname }}"
-      when: current_image_tag != "IMAGE_TAG={{ IMAGE_TAG }}"
+      when: not image_tag_same
 
     - name: Run Docker Compose up
       shell: docker-compose -f "{{ docker_compose_path }}" up -d
       args:
         chdir: "{{ docker_compose_path | dirname }}"
-      when: current_image_tag != "IMAGE_TAG={{ IMAGE_TAG }}"
+      when: not image_tag_same
