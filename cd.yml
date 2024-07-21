@@ -1,7 +1,6 @@
 ---
 - name: CD Pipeline
   hosts: localhost
-  become: yes
 
   vars:
     env_file_path: /home/dmacq/testing_rnd/.env
