@@ -5,6 +5,15 @@
     compose_file_path: ""
     image_tag: ""
   tasks:
+    - name: Print compose_file_path
+      debug:
+        msg: "compose_file_path is set to {{ compose_file_path }}"
+
+    - name: Ensure the compose file path is set
+      fail:
+        msg: "compose_file_path is not set."
+      when: compose_file_path == ""
+
     - name: Read docker-compose.yaml file
       slurp:
         src: "{{ compose_file_path }}"
@@ -18,19 +27,13 @@
       set_fact:
         compose_dict: "{{ compose_content | from_yaml }}"
 
+    - name: Initialize updated_services
+      set_fact:
+        updated_services: false
+
     - name: Check and update image tags in docker-compose.yaml
       set_fact:
-        updated_services: >-
-          {{
-            dict(compose_dict['services'].items() |
-            map('extract', 0, 1) |
-            map('extract', 1) |
-            map('extract', 'image') |
-            map('split', ':') |
-            map('first') |
-            map('combine', compose_dict['services'].keys()) |
-            list)
-          }}
+        compose_dict_updated: "{{ compose_dict }}"
       loop: "{{ compose_dict['services'].items() }}"
       loop_control:
         loop_var: service_item
@@ -38,7 +41,8 @@
       vars:
         updated_image: "{{ service_item[1].image.split(':')[0] + ':' + image_tag }}"
       set_fact:
-        compose_dict_updated: "{{ compose_dict | combine({'services': {service_item[0]: {'image': updated_image}}}) }}"
+        compose_dict_updated: "{{ compose_dict_updated | combine({'services': {service_item[0]: {'image': updated_image}}}) }}"
+        updated_services: true
 
     - name: Write updated docker-compose.yaml content
       copy:
